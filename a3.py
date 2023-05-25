@@ -236,12 +236,35 @@ class FarmGame:
     def handle_keypress(self, event: tk.Event):
         """Handle keypress events"""
         key = event.keysym
+        (y, x) = self.model._player.get_position()
         if key == 'Left':
             # Implement logic for handling left key press
-            pass
+            if self.model._player._direction != LEFT:
+                self.model._player._direction = LEFT
+            else:
+                if x - 1 >= 0:
+                    self.model._player.set_position((y, x - 1))
         elif key == 'Right':
             # Implement logic for handling right key press
-            pass
+            if self.model._player._direction != RIGHT:
+                self.model._player._direction = RIGHT
+            else:
+                if x + 1 < 10:
+                    self.model._player.set_position((y, x + 1))
+        elif key == 'Up':
+            # Implement logic for handling right key press
+            if self.model._player._direction != UP:
+                self.model._player._direction = UP
+            else:
+                if y > 0:
+                    self.model._player.set_position((y - 1, x))
+        elif key == 'Down':
+            # Implement logic for handling right key press
+            if self.model._player._direction != DOWN:
+                self.model._player._direction = DOWN
+            else:
+                if y + 1 < 10:
+                    self.model._player.set_position((y + 1, x))
         # Implement similar conditionals for other key press events
         self.redraw()
 
