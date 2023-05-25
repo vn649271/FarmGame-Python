@@ -88,10 +88,14 @@ class FarmView(AbstractGrid):
         self.clear()
 
         cell_width, cell_height = self.get_cell_size()
-
+        tile_filenames = {
+            "G": "grass",
+            "S": "soil",
+            "U": "untilled_soil"
+        }
         for row in range(self._dimensions[0]):
             for col in range(self._dimensions[1]):
-                tile = ground[row][col]
+                tile = tile_filenames[ground[row][col]]
                 image_name = 'images/' + f'{tile}.png'
                 image = get_image(image_name, (cell_width, cell_height), self._image_cache)
                 self.create_image(self.get_midpoint((row, col)), image=image)
@@ -212,7 +216,7 @@ class FarmGame:
 
         # Create 'Next day' button
         self.next_day_button = tk.Button(master, text='Next day', command=self.advance_day)
-        self.next_day_button.grid(row=2, column=2)
+        self.next_day_button.grid(row=3, column=0)
 
         # Bind keypress event
         master.bind('<KeyPress>', self.handle_keypress)
