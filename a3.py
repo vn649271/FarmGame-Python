@@ -44,6 +44,20 @@ class InfoBar(AbstractGrid):
         self.annotate_position((0, 2), "Energy: ")
         self.annotate_position((1, 2), f"{self._energy}")
 
+class MainView(AbstractGrid):
+    """A GUI parent view component that including farm view and item view."""
+
+    def __init__(self, master: tk.Tk | tk.Frame, dimensions: tuple[int, int], 
+                 size: tuple[int, int], **kwargs) -> None:
+        """Initializes the FarmView.
+        Parameters:
+            master: The master frame for this Canvas.
+            dimensions: The dimensions of the grid as (#rows, #columns)
+            size: The size of the grid as (width in pixels, height in pixels)
+        """
+        super().__init__(master, dimensions, size)
+        # self.config(bg="gray")
+        self._image_cache = {}
 
 class FarmView(AbstractGrid):
     """A GUI component that displays the farm."""
@@ -57,7 +71,7 @@ class FarmView(AbstractGrid):
             dimensions: The dimensions of the grid as (#rows, #columns)
             size: The size of the grid as (width in pixels, height in pixels)
         """
-        super().__init__(master, (10, 10), (FARM_WIDTH, FARM_WIDTH))
+        super().__init__(master, dimensions, size)
         self.config(bg="blue")
         self._image_cache = {}
 
@@ -117,21 +131,23 @@ class ItemView(tk.Frame):
         # Configure the section labels and buttons
         for item in ITEMS:
             section = self._sections[item]
+            labels_subsection = tk.Frame(section)
+            labels_subsection.pack(side=tk.LEFT)
             buy_price = BUY_PRICES.get(item)
             sell_price = SELL_PRICES.get(item)
 
             label_text = f"{item}:"
-            label = tk.Label(section, text=label_text)
-            label.pack(side=tk.TOP, anchor=tk.W)
+            label = tk.Label(labels_subsection, text=label_text)
+            label.pack(side=tk.TOP)
 
             if sell_price is not None:
                 sell_price_text = f"Sell Price: ${sell_price}"
-                sell_price_label = tk.Label(section, text=sell_price_text)
+                sell_price_label = tk.Label(labels_subsection, text=sell_price_text)
                 sell_price_label.pack(side=tk.TOP, anchor=tk.W)
 
             if buy_price is not None:
                 buy_price_text = f"Buy Price: ${buy_price}"
-                buy_price_label = tk.Label(section, text=buy_price_text)
+                buy_price_label = tk.Label(labels_subsection, text=buy_price_text)
                 buy_price_label.pack(side=tk.TOP, anchor=tk.W)
 
             button_frame = tk.Frame(section)
@@ -180,12 +196,19 @@ class FarmGame:
         self.info_bar = InfoBar(master)
         self.info_bar.redraw(1,2,3)
         self.info_bar.grid(row=2, column=0, columnspan=3)
-        self.farm_view = FarmView(master, (FARM_WIDTH, 700), (100,100))
-        self.farm_view.grid(row=1, column=0)
+        # Parent view including farm view and items view
+        self.main_view = MainView(
+            master, 
+            (1, 1),
+            (FARM_WIDTH + INVENTORY_WIDTH, FARM_WIDTH)
+        )
+        self.main_view.grid(row=1, column=0)
+        # Farm view
+        self.farm_view = FarmView(self.main_view, (10, 10), (FARM_WIDTH, FARM_WIDTH))
+        self.farm_view.grid(row=0, column=0)
 
-        
-        self.item_view = ItemView(master, self.select_item, self.sell_item, self.buy_item)
-        self.item_view.grid(row=1, column=10, columnspan=6)
+        self.item_view = ItemView(self.main_view, self.select_item, self.sell_item, self.buy_item)
+        self.item_view.grid(row=0, column=6)
 
         # Create 'Next day' button
         self.next_day_button = tk.Button(master, text='Next day', command=self.advance_day)
@@ -200,9 +223,9 @@ class FarmGame:
     def redraw(self):
         """Redraws the game based on current model state"""
         # Update views
-        self.info_bar.redraw(self.model.day, self.model.money, self.model.energy)  # Replace placeholders with actual values
-        self.farm_view.redraw(self.model.ground, self.model.plants, self.model.player_position, self.model.player_direction)
-        self.item_view.redraw(self.item_name, self.amount)
+        self.info_bar.redraw(self.model._days_elapsed, self.model._player._money, self.model._player._energy)  # Replace placeholders with actual values
+        self.farm_view.redraw(self.model._map, self.model._plants, self.model._player._position, self.model._player._direction)
+        # self.item_view.redraw(self.item_name, self.amount)  **********
         # Replace placeholders with actual values
         # Implement similar update methods for other views as needed
 
