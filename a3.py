@@ -289,7 +289,7 @@ class FarmGame:
     def handle_keypress(self, event: tk.Event):
         """Handle keypress events"""
         key = event.keysym
-        (y, x) = self.model.get_player().get_position()
+        pos = self.model.get_player().get_position()
         if key == 'Left' or key == 'a':
             # Implement logic for handling left key press
            self.model.move_player(LEFT)
@@ -305,10 +305,10 @@ class FarmGame:
         # Implement similar conditionals for other key press events
         elif key == 'p':
             self.plant()
-        elif key == 'h':
-            harvest = self.model.harvest_plant(self.model.get_player_position())
-            if harvest != None:
-                self.model.get_player().add_item(harvest)
+        elif key == 'h' and self.model.harvest_plant(pos) != None:
+            self.model.get_player().add_item(self.model.harvest_plant(pos))
+        elif key == 'r' and self.model.get_plants().get(pos) != None:
+            self.model.remove_plant(pos)
 
         self.redraw()
 
@@ -358,9 +358,9 @@ class FarmGame:
         plant_map = self.model.get_plants()
         if plant_map.get(pos) != None and plant_map[pos].get_name() == new_plant.get_name():
             return
-        self.model.add_plant(pos, new_plant)
         player_inventory = self.model.get_player().get_inventory()
-        if player_inventory[plant] > 0:
+        if player_inventory.get(plant) != None and player_inventory.get(plant) > 0:
+            self.model.add_plant(pos, new_plant)
             self.model.get_player().remove_item((plant, 1))
         self.redraw()
 
