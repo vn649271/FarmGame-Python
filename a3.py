@@ -39,9 +39,9 @@ class InfoBar(AbstractGrid):
 
         self.annotate_position((0, 0), "Day:")
         self.annotate_position((1, 0), f"{self._day}")
-        self.annotate_position((0, 1), "Money: ")
+        self.annotate_position((0, 1), "Money:")
         self.annotate_position((1, 1), f"{self._money}")
-        self.annotate_position((0, 2), "Energy: ")
+        self.annotate_position((0, 2), "Energy:")
         self.annotate_position((1, 2), f"{self._energy}")
 
 class MainView(AbstractGrid):
@@ -305,11 +305,16 @@ class FarmGame:
         # Implement similar conditionals for other key press events
         elif key == 'p':
             self.plant()
-        elif key == 'h' and self.model.harvest_plant(pos) != None:
-            self.model.get_player().add_item(self.model.harvest_plant(pos))
+        elif key == 'h':
+            harvest = self.model.harvest_plant(pos)
+            if harvest is not None:
+                self.model.get_player().add_item(harvest)
         elif key == 'r' and self.model.get_plants().get(pos) != None:
             self.model.remove_plant(pos)
-
+        elif key == 't':
+            self.model.till_soil(pos)
+        elif key == 'u':
+            self.model.untill_soil(pos)
         self.redraw()
 
     def select_item(self, item_name: str):
@@ -365,7 +370,6 @@ class FarmGame:
         self.redraw()
 
 def play_game(root: tk.Tk, map_file: str) -> None:
-    
     game = FarmGame(root, map_file)
     root.mainloop()
 
