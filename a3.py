@@ -1,382 +1,434 @@
+"""
+CSSE1001 Assignment 3
+Semester 1, 2023
+"""
+__author__ = "Orhan Ors"
+__email__ = "o.ors@uq.net.au"
+__date__ = "25/05/2023"
+
 import tkinter as tk
-from tkinter import filedialog # For masters task
+from tkinter import filedialog 
 from typing import Callable, Union, Optional
 from a3_support import *
 from model import *
 from constants import *
 
-# Implement your classes here
-class InfoBar(AbstractGrid):
-    def __init__(self, master: tk.Tk | tk.Frame) -> None:
-        """Initializes the InfoBar.
 
-        Parameters:
-            master: The master frame for this Canvas.
-        """
-        counter = 1
-        
+class InfoBar(AbstractGrid):
+    """ A view class
+    Displays information to the user about the number of days elapsed in
+    the game, as well as the player’s energy and money
+    """
+    def __init__(self, master: tk.Tk | tk.Frame) -> None:
+
         super().__init__(master, (2, 3), (FARM_WIDTH+INVENTORY_WIDTH,
                                           INFO_BAR_HEIGHT))
-        self._day = None
-        self._money = None
-        self._energy = None
-        self.config(bg="yellow")
-        
+
+        self.set_dimensions((2, 3))
+        self.pack(side=tk.BOTTOM)
 
     def redraw(self, day: int, money: int, energy: int) -> None:
-        """Clears the InfoBar and redraws it.
-
-        Parameters:
-            day: The current day.
-            money: The current amount of money.
-            energy: The current amount of energy.
-        """
         self.clear()
         
-        self._day = day
-        self._money = money
-        self._energy = energy
+        # Layout of infobar status text
+        infobar_status = ['Day:', 'Money:', 'Energy:']
+        for text in range(len(infobar_status)):
+            position = self.get_midpoint((0, text))
+            self.create_text(position[0], position[1],
+                             text=infobar_status[text],
+                             font=HEADING_FONT)
+        self.pack(side=tk.BOTTOM)
+        
+        # Layout of infobar status variables
+        status_amounts = [day, '${}'.format(money), energy]
+        for amounts in range(len(status_amounts)):
+            position = self.get_midpoint((1, amounts))
+            self.create_text(position[0], position[1],
+                             text=status_amounts[amounts])
+        self.pack(side=tk.BOTTOM, fill= tk.BOTH, expand=True)
 
-        self.annotate_position((0, 0), "Day:")
-        self.annotate_position((1, 0), f"{self._day}")
-        self.annotate_position((0, 1), "Money:")
-        self.annotate_position((1, 1), f"{self._money}")
-        self.annotate_position((0, 2), "Energy:")
-        self.annotate_position((1, 2), f"{self._energy}")
-
-class MainView(AbstractGrid):
-    """A GUI parent view component that including farm view and item view."""
-
-    def __init__(self, master: tk.Tk | tk.Frame, dimensions: tuple[int, int], 
-                 size: tuple[int, int], **kwargs) -> None:
-        """Initializes the FarmView.
-        Parameters:
-            master: The master frame for this Canvas.
-            dimensions: The dimensions of the grid as (#rows, #columns)
-            size: The size of the grid as (width in pixels, height in pixels)
-        """
-        super().__init__(master, dimensions, size)
-        # self.config(bg="gray")
-        self._image_cache = {}
 
 class FarmView(AbstractGrid):
-    """A GUI component that displays the farm."""
-
-    def __init__(self, master: tk.Tk | tk.Frame, dimensions: tuple[int, int], 
+    """ A view class
+        Displays a grid containing the farm map, player, and plants
+    """
+    def __init__(self, master: tk.Tk | tk.Frame, dimensions: tuple[int, int],
                  size: tuple[int, int], **kwargs) -> None:
-        """Initializes the FarmView.
 
-        Parameters:
-            master: The master frame for this Canvas.
-            dimensions: The dimensions of the grid as (#rows, #columns)
-            size: The size of the grid as (width in pixels, height in pixels)
-        """
-        super().__init__(master, dimensions, size)
-        self.config(bg="blue")
-        self._image_cache = {}
+        super().__init__(master, dimensions, size, **kwargs)
 
-    def redraw(self, ground: list[str], plants: dict[tuple[int, int], 'Plant'], 
+        self._size = size
+        self.set_dimensions(dimensions)
+        self.cache = {}
+        self.pack(side=tk.LEFT)
+
+    def redraw(self, ground: list[str], plants: dict[tuple[int, int], 'Plant'],
                player_position: tuple[int, int], player_direction: str) -> None:
-        """Redraws the FarmView.
 
-        Parameters:
-            ground: The list of strings representing the tiles in the map.
-            plants: The dictionary mapping (row, col) positions to Plants.
-            player_position: The current position of the player as (row, col).
-            player_direction: The current direction of the player.
-        """
+        # Prevent duplicating visuals
         self.clear()
 
-        cell_width, cell_height = self.get_cell_size()
-        tile_filenames = {
-            "G": "grass",
-            "S": "soil",
-            "U": "untilled_soil"
-        }
-        for row in range(self._dimensions[0]):
-            for col in range(self._dimensions[1]):
-                tile = tile_filenames[ground[row][col]]
-                image_name = 'images/' + f'{tile}.png'
-                image = get_image(image_name, (cell_width, cell_height), self._image_cache)
-                self.create_image(self.get_midpoint((row, col)), image=image)
+        # Generate the map
+        image_size = self.get_cell_size()
+        for row in range(len(ground)):
+            for col in range(len(ground[row])):
+                # Select tile 
+                floor = ground[row][col]
+                image_name = IMAGES[floor]
+                image_path = 'images/{}'.format(image_name)
+                tile = get_image(image_path, image_size, self.cache)
+                self.cache[image_name] = tile  
+                # Place tile
+                tile_position = self.get_midpoint((row, col))
+                self.create_image(tile_position[0], tile_position[1],
+                                  image=tile)
+                # Place plants on map
+                for plant in plants.keys():
+                    if row == plant[0] and col == plant[1]:
+                        plant_type = plants[plant]
+                        plant_name = get_plant_image_name(plant_type)
+                        image_location = f"images/{plant_name}"
+                        plant_image = get_image(image_location,
+                                                image_size, self.cache)
+                        self.cache[image_location] = plant_image 
 
-        for position, plant in plants.items():
-            image_name = 'images/' + get_plant_image_name(plant)
-            image = get_image(image_name, (cell_width, cell_height), self._image_cache)
-            self.create_image(self.get_midpoint(position), image=image)
+                        plant_position = self.get_midpoint(plant)
+                        self.create_image(plant_position[0], plant_position[1],
+                                          image=plant_image)
+                # Place player on map
+                if row == player_position[0] and col == player_position[1]:
+                    image_location = 'images/{}'.format(IMAGES[player_direction])
+                    player_image = get_image(image_location, image_size,
+                                           self.cache)
 
-        player_image_name = 'images/' + f'player_{player_direction}.png'
-        player_image = get_image(player_image_name, (cell_width, cell_height), self._image_cache)
-        self.create_image(self.get_midpoint(player_position), image=player_image)
+                    position = self.get_midpoint(player_position)
+                    self.create_image(position[0], position[1],
+                                      image=player_image)
+
 
 class ItemView(tk.Frame):
-    """A GUI component that displays the item sections."""
-
-    def __init__(self, master: tk.Frame, select_command: Optional[Callable[[str], None]] = None,
+    """ A view class
+        Displays the relevant information and buttons for each of the 6 items
+        available in the game
+    """
+    def __init__(self, master: tk.Frame, item_name: str, amount: int,
+                 select_command: Optional[Callable[[str], None]] = None,
                  sell_command: Optional[Callable[[str], None]] = None,
                  buy_command: Optional[Callable[[str], None]] = None) -> None:
-        """Initializes the ItemView.
 
-        Parameters:
-            master: The master frame for this Frame.
-            select_command: The callback function to call when an item is selected.
-            sell_command: The callback function to call when an item is sold.
-            buy_command: The callback function to call when an item is bought.
-        """
         super().__init__(master)
-        self._selected_item = None
-        self._prev_selected_item = None
 
-        self._sections = {}
-        self._label_frames = {}
-        self._labels = {}
-        self._sell_price_labels = {}
-        self._buy_price_labels = {}
-
-        # Create the sections for each item
-        for item in ITEMS:
-            section = tk.Frame(self)
-            section.pack(fill=tk.BOTH, padx=3, pady=3)
-            section.config(bg=INVENTORY_COLOUR)
-            self._sections[item] = section
+        self._item_name = item_name
         
-        # Configure the section labels and buttons
-        for item in ITEMS:
+        try:
+            self._buy_price = BUY_PRICES[item_name]
+        except KeyError:
+            self._buy_price = 'N/A'
+            
+        if item_name in SELL_PRICES:
+            self._sell_price = SELL_PRICES[item_name]
+        else:
+            self._sell_price = 'N/A'
+        item = item_name
+        # Set background colour based on available stock
+        if amount > 0:
+            self.config(bg=INVENTORY_COLOUR, padx=10)
+        else:
+            self.config(bg=INVENTORY_EMPTY_COLOUR, padx=10)
+        # ItemView layout
+        if item_name in SEEDS: # start with seeds
+            # display relevant item text
+            self._item_name_label = tk.Label(self, padx=10, pady=20, text='{}: {}\n Sell price: ${}\n Buy price: ${}'.format(item_name, amount, SELL_PRICES[item_name], BUY_PRICES[item_name]), borderwidth=0, highlightthickness=0)
+            self._item_name_label.pack(side=tk.LEFT)
+            # create buy button
+            self._buy_btn = tk.Button(self, text="Buy", padx=10)
+            self._buy_btn.pack(side=tk.LEFT)
+            # create sell button
+            self._sell_btn = tk.Button(self, text="Sell", padx=10)
+            self._sell_btn.pack(side=tk.LEFT)
+            # bind mouse click for buying and selling
+            self._item_name_label.bind('<Button-1>', lambda event, item=self._item_name: select_command(item))
+            self._sell_btn.bind('<Button-1>', lambda event, item=self._item_name: sell_command(item))
+            self._buy_btn.bind('<Button-1>', lambda event, item=self._item_name: buy_command(item))
+            self._item_name_label.pack()
+        else: # then all non-seeds
+            self._item_name_label = tk.Label(self, padx=34, pady=18, text='{}: {}\n Sell price: ${}\n Buy price: $N/A'.format(item_name, amount, SELL_PRICES[item_name]), borderwidth=0, highlightthickness=0)
+            self._item_name_label.pack(side=tk.LEFT)
+            # create sell button
+            self._sell_btn = tk.Button(self, text="Sell", padx=5)
+            self._sell_btn.pack(side=tk.RIGHT)
+            # bind mouse click for selling
+            self._item_name_label.bind('<Button-1>', lambda event, item=item: select_command(item))
+            self._sell_btn.bind('<Button-1>', lambda event, item=item: sell_command(item))
 
-            section = self._sections[item]
-            label_frame = tk.Frame(section)
-            label_frame.config(bg=INVENTORY_COLOUR)
-            label_frame.pack(side=tk.LEFT, fill=tk.X, padx=2, pady=13)
-            self._label_frames[item] = label_frame
 
-            buy_price = BUY_PRICES.get(item)
-            sell_price = SELL_PRICES.get(item)
+    def update(self, amount: int, selected: bool = False) -> None:
+        amount_update = amount
 
-            label_text = f"{item}:"
-            label = tk.Label(label_frame, text=label_text)
-            label.config(bg=INVENTORY_COLOUR)
-            self._labels[item] = label
-            label.pack(side=tk.TOP)
-
-            if sell_price is not None:
-                sell_price_text = f"Sell Price: ${sell_price}"
-                sell_price_label = tk.Label(label_frame, text=sell_price_text)
-                sell_price_label.pack(side=tk.TOP, anchor=tk.W)
-                sell_price_label.config(bg=INVENTORY_COLOUR)
-                self._sell_price_labels[item] = sell_price_label
-
-            if buy_price is not None:
-                buy_price_text = f"Buy Price: ${buy_price}"
-                buy_price_label = tk.Label(label_frame, text=buy_price_text)
-                buy_price_label.pack(side=tk.TOP, anchor=tk.W)
-                buy_price_label.config(bg=INVENTORY_COLOUR)
-                self._buy_price_labels[item] = buy_price_label
-
-            button_frame = tk.Frame(section)
-            button_frame.pack(side=tk.RIGHT, padx=3)
-
-            if buy_price is not None:
-                buy_button = tk.Button(button_frame, text=f"Buy ({buy_price})",
-                                       command=lambda item=item: buy_command(item))
-                buy_button.pack(side=tk.LEFT)
-
-            if sell_price is not None:
-                sell_button = tk.Button(button_frame, text=f"Sell ({sell_price})",
-                                        command=lambda item=item: sell_command(item))
-                sell_button.pack(side=tk.RIGHT)
-
-            if select_command:
-                section.bind('<Button-1>', lambda event, item=item: select_command(item))
-
-    def redraw(self, inventory: dict[str, int]) -> None:
-        """Updates the display of the item sections.
-
-        Parameters:
-            inventory: The dictionary mapping items to their quantities in the player's inventory.
-        """
-        for item, section in self._sections.items():
-            quantity = inventory.get(item, 0)
-            label_text = f"{item}: {quantity}"
-            self._labels[item].config(text=label_text)
-            if quantity == 0:
-                self._sections[item].config(bg=INVENTORY_EMPTY_COLOUR)
-                self._label_frames[item].config(bg=INVENTORY_EMPTY_COLOUR)
-                self._labels[item].config(bg=INVENTORY_EMPTY_COLOUR)
-                if self._sell_price_labels.get(item) != None:
-                    self._sell_price_labels[item].config(bg=INVENTORY_EMPTY_COLOUR)
-                if self._buy_price_labels.get(item) != None:
-                    self._buy_price_labels[item].config(bg=INVENTORY_EMPTY_COLOUR)
-            elif item != None and item == self._selected_item:
-                self._sections[item].config(bg=INVENTORY_SELECTED_COLOUR)
-                self._label_frames[item].config(bg=INVENTORY_SELECTED_COLOUR)
-                self._labels[item].config(bg=INVENTORY_SELECTED_COLOUR)
-                if self._sell_price_labels.get(item) != None:
-                    self._sell_price_labels[item].config(bg=INVENTORY_SELECTED_COLOUR)
-                if self._buy_price_labels.get(item) != None:
-                    self._buy_price_labels[item].config(bg=INVENTORY_SELECTED_COLOUR)
-            elif item != None and item == self._prev_selected_item:
-                self._sections[item].config(bg=INVENTORY_COLOUR)
-                self._label_frames[item].config(bg=INVENTORY_COLOUR)
-                self._labels[item].config(bg=INVENTORY_COLOUR)
-                if self._sell_price_labels.get(item) != None:
-                    self._sell_price_labels[item].config(bg=INVENTORY_COLOUR)
-                if self._buy_price_labels.get(item) != None:
-                    self._buy_price_labels[item].config(bg=INVENTORY_COLOUR)
+        if self._item_name in SEEDS and self._item_name in ITEMS:
+            if amount_update > 0:
+                if selected:
+                    self.config(bg=INVENTORY_SELECTED_COLOUR)
+                    self._item_name_label.config(
+                        bg=INVENTORY_SELECTED_COLOUR,
+                        text='{}: {}\n Sell price: ${}\n Buy price: ${}'.format(
+                            self._item_name, amount_update, self._sell_price, self._buy_price if self._buy_price != 'N/A' else 'N/A'
+                        ),
+                    )
+                else:
+                    self.config(bg=INVENTORY_COLOUR)
+                    self._item_name_label.config(
+                        bg=INVENTORY_COLOUR,
+                        text='{}: {}\n Sell price: ${}\n Buy price: ${}'.format(
+                            self._item_name, amount_update, self._sell_price, self._buy_price
+                        ),
+                    )
             else:
-                self._sections[item].config(bg=INVENTORY_COLOUR)
-                self._label_frames[item].config(bg=INVENTORY_COLOUR)
-                self._labels[item].config(bg=INVENTORY_COLOUR)
-                if self._sell_price_labels.get(item) != None:
-                    self._sell_price_labels[item].config(bg=INVENTORY_COLOUR)
-                if self._buy_price_labels.get(item) != None:
-                    self._buy_price_labels[item].config(bg=INVENTORY_COLOUR)
+                self.config(bg=INVENTORY_EMPTY_COLOUR)
+                self._item_name_label.config(
+                    bg=INVENTORY_EMPTY_COLOUR,
+                    text='{}: {}\n Sell price: ${}\n Buy price: ${}'.format(
+                        self._item_name, amount_update, self._sell_price, self._buy_price
+                    ),
+                )
+        elif self._item_name not in SEEDS and self._item_name in ITEMS:
+            if amount_update > 0:
+                if selected:
+                    self.config(bg=INVENTORY_SELECTED_COLOUR)
+                    self._item_name_label.config(
+                        bg=INVENTORY_SELECTED_COLOUR,
+                        text='{}: {}\n Sell price: ${}\n Buy price: $N/A'.format(
+                            self._item_name, amount_update, self._sell_price
+                        ),
+                    )
+                else:
+                    self.config(bg=INVENTORY_COLOUR)
+                    self._item_name_label.config(
+                        bg=INVENTORY_COLOUR,
+                        text='{}: {}\n Sell price: ${}\n Buy price: $N/A'.format(
+                            self._item_name, amount_update, self._sell_price
+                        ),
+                    )
+            else:
+                self.config(bg=INVENTORY_EMPTY_COLOUR)
+                self._item_name_label.config(
+                    bg=INVENTORY_EMPTY_COLOUR,
+                    text='{}: {}\n Sell price: ${}\n Buy price: $N/A'.format(
+                        self._item_name, amount_update, self._sell_price
+                    ),
+                )
 
-    def set_selected_item(self, item_name):
-        self._prev_selected_item = self._selected_item
-        self._selected_item = item_name
+
 
 class FarmGame:
-    def __init__(self, master: tk.Tk, map_file: str):
-        """Initializes the FarmGame Controller class"""
-        self.master = master
-        self.master.title('Farm Game')
-
-        # Add banner
-        self.banner = get_image('images/header.png', (FARM_WIDTH+INVENTORY_WIDTH, BANNER_HEIGHT)) 
-        self.banner_label = tk.Label(master, image=self.banner)
-        self.banner_label.grid(row=0, column=0, columnspan=3)
-
-        # Create FarmModel instance
-        self.model = FarmModel(map_file)
-
-        # Create View instances
-        self.info_bar = InfoBar(master)
-        self.info_bar.redraw(1,2,3)
-        self.info_bar.grid(row=2, column=0, columnspan=3)
-        # Parent view including farm view and items view
-        self.main_view = MainView(
-            master, 
-            (1, 1),
-            (FARM_WIDTH + INVENTORY_WIDTH, FARM_WIDTH)
-        )
-        self.main_view.grid(row=1, column=0)
-        # Farm view
-        self.farm_view = FarmView(self.main_view, (10, 10), (FARM_WIDTH, FARM_WIDTH))
-        self.farm_view.grid(row=0, column=0)
-
-        self.item_view = ItemView(self.main_view, self.select_item, self.sell_item, self.buy_item)
-        self.item_view.grid(row=0, column=6)
-
-        # Create 'Next day' button
-        self.next_day_button = tk.Button(master, text='Next day', command=self.advance_day)
-        self.next_day_button.grid(row=3, column=0)
-
-        # Bind keypress event
+    """ The controller class for the overall game.
+        responsible for creating and maintaining instances of the model
+        and view classes, event handling, and facilitating communication
+        between the model and view classes
+    """
+    def __init__(self, master: tk.Tk, map_file: str) -> None:
+        # Set the title of the window
+        master.title("Farm Game")
+        self._cache = {}
+        # Create the title banner
+        banner = get_image('images/header.png', (FARM_WIDTH+INVENTORY_WIDTH,
+                                                 BANNER_HEIGHT), self._cache)
+        label = tk.Label(master, image=banner, borderwidth=1, highlightthickness=1)
+        label.pack()
+        # Create the FarmModel instance
+        self._model = FarmModel(map_file)
+        # Command to execute next day
+        def next_day():
+            self._model.new_day()
+            self._infobar.redraw(self._model.get_days_elapsed(),
+                                 self._model.get_player().get_money(),
+                                 self._model.get_player().get_energy())
+            self.redraw()
+        
+        # "Next day" button
+        tk.Button(master, text="Next day", command=next_day).pack(side=tk.BOTTOM)
+        # Create InfoBar instance
+        self._infobar = InfoBar(master)
+        # Create FarmView instance
+        self._farmview = FarmView(master, self._model.get_dimensions(),
+                                  (FARM_WIDTH, FARM_WIDTH))
+        self.items_dict = {}
+        
+        # Create ItemView instance
+        item_frame = tk.Frame(master, height=FARM_WIDTH, width=INVENTORY_WIDTH,
+                              borderwidth=0, highlightthickness=0)
+        inventory = self._model.get_player().get_inventory()
+        
+        for item_name in ITEMS:
+            item_qty = 0
+            if item_name in inventory:
+                item_qty = inventory[item_name]
+            if item_name in SEEDS:
+                item_view = ItemView(item_frame, item_name, item_qty,
+                                     self.select_item, self.sell_item, self.buy_item)
+            else:
+                item_view = ItemView(item_frame, item_name, item_qty,
+                                     self.select_item, self.sell_item)
+            
+            item_view.pack(side=tk.TOP)
+            self.items_dict[item_name] = item_view
+        
+        item_frame.pack()
+        self.redraw()
+        
         master.bind('<KeyPress>', self.handle_keypress)
+        master.mainloop()
 
-        # Draw the initial state of the game
+
+    def redraw(self) -> None:
+        # Redraw each view class
+        # Redraw FarmView
+        ground = self._model.get_map()
+        plants = self._model.get_plants()
+        position = self._model.get_player().get_position()
+        direction = self._model.get_player().get_direction()
+        self._farmview.redraw(ground, plants, position, direction)
+
+        # Redraw InfoBar
+        day = self._model.get_days_elapsed()
+        money = self._model.get_player().get_money()
+        energy = self._model.get_player().get_energy()
+        self._infobar.redraw(day, int(money), energy)
+
+        # Redraw ItemView
+        frames = self.items_dict
+        player_inventory = self._model.get_player().get_inventory()
+        player_selected_item = self._model.get_player().get_selected_item()
+        for item in ITEMS:
+            item_frame = frames[item]
+            # Player has item in inventory
+            try:
+                item_amount = player_inventory[item]
+                if item == player_selected_item:
+                    item_frame.update(item_amount, True)
+                else:
+                    item_frame.update(item_amount, False)
+            # Player does not have item in inventory
+            except KeyError:
+                item_amount = 0
+                item_frame.update(item_amount, False)
+
+        # Update selected item in ItemView
+        selected_frame = frames.get(player_selected_item)
+        if selected_frame:
+            selected_frame.update(player_inventory.get(player_selected_item, 0), True)
+
+
+    def handle_keypress(self, event: tk.Event) -> None:
+        keypress = event.keysym.lower()
+        keycharsym = event.keysym
+        keypress = keypress.lower()
+        player = self._model.get_player()
+        player_position = self._model.get_player().get_position()
+        player_selected_item = self._model.get_player().get_selected_item()
+        player_inventory = self._model.get_player().get_inventory()
+
+        valid_player_directions = 'wasd'
+        if keypress in valid_player_directions and keycharsym in valid_player_directions:
+            self._model.move_player(keypress)
+            self.redraw()
+        # Till soil
+        elif (keypress == "t") and (keycharsym == "t"):  
+            self._model.till_soil(player_position)
+            self.redraw()
+        # Until soil
+        elif (keypress == "u") and (keycharsym == "u"):  
+            self._model.untill_soil(player_position)
+            self.redraw()
+        # Plant seed
+        elif keypress == "p":  
+            map = self._model.get_map()
+            row, col = player_position
+            if (map[row][col] == SOIL) and (player_selected_item in player_inventory):
+                if player_selected_item == 'Potato Seed':
+                    self._model.add_plant(player_position, PotatoPlant())
+                elif player_selected_item == 'Kale Seed':
+                    self._model.add_plant(player_position, KalePlant())
+                elif player_selected_item == 'Berry Seed':
+                    self._model.add_plant(player_position, BerryPlant())
+                else:
+                    return
+
+                frames = self.items_dict
+                item_frame = frames[player_selected_item]
+                item_frame.update(player_inventory.get(player_selected_item, 0), True)
+                self._model.get_player().remove_item((player_selected_item, 1))
+                self.redraw()
+
+            else:
+                return
+        # Pick produce
+        elif keypress == "h":  
+            harvest_result = self._model.harvest_plant(player_position)
+            if harvest_result is None:
+                return
+
+            frames = self.items_dict
+            item_frame = frames[harvest_result[0]]
+            self._model.get_player().add_item(harvest_result)
+            item_frame.update(self._model.get_player().get_inventory()[harvest_result[0]], False)
+            self.redraw()
+            pass
+        # Remove plant
+        elif keypress == "r":  
+            self._model.remove_plant(player_position)
+            self.redraw()
+        elif keypress == '':
+            pass
+        else:
+            pass
+
+    def select_item(self, item_name: str) -> None:
+        for item in ITEMS:
+            if item_name == item:
+                self._model.get_player().select_item(item_name)
         self.redraw()
 
-    def redraw(self):
-        """Redraws the game based on current model state"""
-        # Update views
-        self.info_bar.redraw(self.model._days_elapsed, self.model.get_player()._money, self.model.get_player()._energy)  # Replace placeholders with actual values
-        self.farm_view.redraw(self.model._map, self.model._plants, self.model.get_player()._position, self.model.get_player()._direction)
-        self.item_view.redraw(self.model.get_player()._inventory)
-        # Replace placeholders with actual values
-        # Implement similar update methods for other views as needed
 
-    def handle_keypress(self, event: tk.Event):
-        """Handle keypress events"""
-        key = event.keysym
-        pos = self.model.get_player().get_position()
-        if key == 'Left' or key == 'a':
-            # Implement logic for handling left key press
-           self.model.move_player(LEFT)
-        elif key == 'Right' or key == 'd':
-            # Implement logic for handling right key press
-           self.model.move_player(RIGHT)
-        elif key == 'Up' or key == 'w':
-            # Implement logic for handling right key press
-           self.model.move_player(UP)
-        elif key == 'Down' or key == 's':
-            # Implement logic for handling right key press
-           self.model.move_player(DOWN)
-        # Implement similar conditionals for other key press events
-        elif key == 'p':
-            self.plant()
-        elif key == 'h':
-            harvest = self.model.harvest_plant(pos)
-            if harvest is not None:
-                self.model.get_player().add_item(harvest)
-        elif key == 'r' and self.model.get_plants().get(pos) != None:
-            self.model.remove_plant(pos)
-        elif key == 't':
-            self.model.till_soil(pos)
-        elif key == 'u':
-            self.model.untill_soil(pos)
-        self.redraw()
+    def buy_item(self, item_name: str) -> None:
+        player_money = self._model.get_player().get_money()
+        price_of_item_to_buy = BUY_PRICES[item_name]
 
-    def select_item(self, item_name: str):
-        """Handle item selection"""
-        # Update the model with the selected item
-        self.model.get_player().select_item(item_name)
-        self.item_view.set_selected_item(item_name)
+        if player_money >= price_of_item_to_buy:
+            self._model.get_player().buy(item_name, price_of_item_to_buy)
 
-        self.redraw()
-
-    def buy_item(self, item_name: str):
-        """Handle buying items"""
-        # Update the model with the purchased item
-        self.model.get_player().buy(item_name, BUY_PRICES[item_name])
-        self.redraw()
-
-    def sell_item(self, item_name: str):
-        """Handle selling items"""
-        # Update the model with the sold item
-        self.model.get_player().sell(item_name, SELL_PRICES[item_name])  
-        self.redraw()
-
-    def advance_day(self):
-        """Advance the game to the next day"""
-        # Implement the logic for advancing to the next day in the model
-        self.model.new_day()
-        self.redraw()
-    def plant(self):
-        """ Attempt to plant 
-        that seed at the player’s current position
-        """
-        pos = self.model.get_player_position()
-        plant = self.model.get_player()._selected_item
-        if plant == None:
+            if item_name in self._model.get_player().get_inventory():
+                frames = self.items_dict
+                item_frame = frames[item_name]
+                item_frame.update(self._model.get_player().get_inventory()[item_name], False)
+            self.redraw()
+        else:
             return
-        if self.model._map[pos[0]][pos[1]] != 'S':
-            return
-        # Create new concrete plant object
-        new_plant = None
-        if (plant == ITEMS[0]):
-            new_plant = PotatoPlant()
-        if (plant == ITEMS[1]):
-            new_plant = KalePlant()
-        if (plant == ITEMS[2]):
-            new_plant = BerryPlant()
-        plant_map = self.model.get_plants()
-        if plant_map.get(pos) != None and plant_map[pos].get_name() == new_plant.get_name():
-            return
-        player_inventory = self.model.get_player().get_inventory()
-        if player_inventory.get(plant) != None and player_inventory.get(plant) > 0:
-            self.model.add_plant(pos, new_plant)
-            self.model.get_player().remove_item((plant, 1))
+
+
+    def sell_item(self, item_name: str) -> None:
+        price_of_item_to_sell = SELL_PRICES[item_name]
+        self._model.get_player().sell(item_name, price_of_item_to_sell)
+        self._infobar.redraw(self._model.get_days_elapsed(),
+                             self._model.get_player().get_money(),
+                             self._model.get_player().get_energy())  # Update money in InfoBar
+        if item_name in self._model.get_player().get_inventory():
+            frames = self.items_dict
+            item_frame = frames[item_name]
+            item_frame.update(self._model.get_player().get_inventory()[item_name], False)
         self.redraw()
+
+
 
 def play_game(root: tk.Tk, map_file: str) -> None:
+    
     game = FarmGame(root, map_file)
     root.mainloop()
 
 def main() -> None:
     
     root = tk.Tk()
-    map_file = 'maps/map1.txt'
+    map_file = filedialog.askopenfilename()
     play_game(root, map_file)
 
 if __name__ == '__main__':
