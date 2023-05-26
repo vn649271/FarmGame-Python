@@ -222,6 +222,15 @@ class ItemView(tk.Frame):
                     self._sell_price_labels[item].config(bg=INVENTORY_COLOUR)
                 if self._buy_price_labels.get(item) != None:
                     self._buy_price_labels[item].config(bg=INVENTORY_COLOUR)
+            else:
+                self._sections[item].config(bg=INVENTORY_COLOUR)
+                self._label_frames[item].config(bg=INVENTORY_COLOUR)
+                self._labels[item].config(bg=INVENTORY_COLOUR)
+                if self._sell_price_labels.get(item) != None:
+                    self._sell_price_labels[item].config(bg=INVENTORY_COLOUR)
+                if self._buy_price_labels.get(item) != None:
+                    self._buy_price_labels[item].config(bg=INVENTORY_COLOUR)
+
     def set_selected_item(self, item_name):
         self._prev_selected_item = self._selected_item
         self._selected_item = item_name
@@ -271,49 +280,42 @@ class FarmGame:
     def redraw(self):
         """Redraws the game based on current model state"""
         # Update views
-        self.info_bar.redraw(self.model._days_elapsed, self.model._player._money, self.model._player._energy)  # Replace placeholders with actual values
-        self.farm_view.redraw(self.model._map, self.model._plants, self.model._player._position, self.model._player._direction)
-        self.item_view.redraw(self.model._player._inventory)
+        self.info_bar.redraw(self.model._days_elapsed, self.model.get_player()._money, self.model.get_player()._energy)  # Replace placeholders with actual values
+        self.farm_view.redraw(self.model._map, self.model._plants, self.model.get_player()._position, self.model.get_player()._direction)
+        self.item_view.redraw(self.model.get_player()._inventory)
         # Replace placeholders with actual values
         # Implement similar update methods for other views as needed
 
     def handle_keypress(self, event: tk.Event):
         """Handle keypress events"""
         key = event.keysym
-        (y, x) = self.model._player.get_position()
+        (y, x) = self.model.get_player().get_position()
         if key == 'Left' or key == 'a':
             # Implement logic for handling left key press
-            if self.model._player._direction != LEFT:
-                self.model._player._direction = LEFT
-            if x - 1 >= 0:
-                self.model._player.set_position((y, x - 1))
+           self.model.move_player(LEFT)
         elif key == 'Right' or key == 'd':
             # Implement logic for handling right key press
-            if self.model._player._direction != RIGHT:
-                self.model._player._direction = RIGHT
-            if x + 1 < 10:
-                self.model._player.set_position((y, x + 1))
+           self.model.move_player(RIGHT)
         elif key == 'Up' or key == 'w':
             # Implement logic for handling right key press
-            if self.model._player._direction != UP:
-                self.model._player._direction = UP
-            if y > 0:
-                self.model._player.set_position((y - 1, x))
+           self.model.move_player(UP)
         elif key == 'Down' or key == 's':
             # Implement logic for handling right key press
-            if self.model._player._direction != DOWN:
-                self.model._player._direction = DOWN
-            if y + 1 < 10:
-                self.model._player.set_position((y + 1, x))
+           self.model.move_player(DOWN)
         # Implement similar conditionals for other key press events
         elif key == 'p':
             self.plant()
+        elif key == 'h':
+            harvest = self.model.harvest_plant(self.model.get_player_position())
+            if harvest != None:
+                self.model.get_player().add_item(harvest)
+
         self.redraw()
 
     def select_item(self, item_name: str):
         """Handle item selection"""
         # Update the model with the selected item
-        self.model._player.select_item(item_name)
+        self.model.get_player().select_item(item_name)
         self.item_view.set_selected_item(item_name)
 
         self.redraw()
@@ -321,13 +323,13 @@ class FarmGame:
     def buy_item(self, item_name: str):
         """Handle buying items"""
         # Update the model with the purchased item
-        self.model._player.buy(item_name, BUY_PRICES[item_name])
+        self.model.get_player().buy(item_name, BUY_PRICES[item_name])
         self.redraw()
 
     def sell_item(self, item_name: str):
         """Handle selling items"""
         # Update the model with the sold item
-        self.model._player.sell(item_name, SELL_PRICES[item_name])  
+        self.model.get_player().sell(item_name, SELL_PRICES[item_name])  
         self.redraw()
 
     def advance_day(self):
@@ -340,12 +342,12 @@ class FarmGame:
         that seed at the player’s current position
         """
         pos = self.model.get_player_position()
-        plant = self.model._player._selected_item
+        plant = self.model.get_player()._selected_item
         if plant == None:
             return
         if self.model._map[pos[0]][pos[1]] != 'S':
             return
-                # Setup plant map
+        # Create new concrete plant object
         new_plant = None
         if (plant == ITEMS[0]):
             new_plant = PotatoPlant()
@@ -353,8 +355,13 @@ class FarmGame:
             new_plant = KalePlant()
         if (plant == ITEMS[2]):
             new_plant = BerryPlant()
-
+        plant_map = self.model.get_plants()
+        if plant_map.get(pos) != None and plant_map[pos].get_name() == new_plant.get_name():
+            return
         self.model.add_plant(pos, new_plant)
+        player_inventory = self.model.get_player().get_inventory()
+        if player_inventory[plant] > 0:
+            self.model.get_player().remove_item((plant, 1))
         self.redraw()
 
 def play_game(root: tk.Tk, map_file: str) -> None:
