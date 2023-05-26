@@ -124,38 +124,56 @@ class ItemView(tk.Frame):
             buy_command: The callback function to call when an item is bought.
         """
         super().__init__(master)
+        self._selected_item = None
+        self._prev_selected_item = None
+
         self._sections = {}
+        self._label_frames = {}
+        self._labels = {}
+        self._sell_price_labels = {}
+        self._buy_price_labels = {}
 
         # Create the sections for each item
         for item in ITEMS:
             section = tk.Frame(self)
-            section.pack(side=tk.TOP, fill=tk.X)
+            section.pack(fill=tk.BOTH, padx=3, pady=3)
+            section.config(bg=INVENTORY_COLOUR)
             self._sections[item] = section
-
+        
         # Configure the section labels and buttons
         for item in ITEMS:
+
             section = self._sections[item]
-            labels_subsection = tk.Frame(section)
-            labels_subsection.pack(side=tk.LEFT)
+            label_frame = tk.Frame(section)
+            label_frame.config(bg=INVENTORY_COLOUR)
+            label_frame.pack(side=tk.LEFT, fill=tk.X, padx=2, pady=13)
+            self._label_frames[item] = label_frame
+
             buy_price = BUY_PRICES.get(item)
             sell_price = SELL_PRICES.get(item)
 
             label_text = f"{item}:"
-            label = tk.Label(labels_subsection, text=label_text)
+            label = tk.Label(label_frame, text=label_text)
+            label.config(bg=INVENTORY_COLOUR)
+            self._labels[item] = label
             label.pack(side=tk.TOP)
 
             if sell_price is not None:
                 sell_price_text = f"Sell Price: ${sell_price}"
-                sell_price_label = tk.Label(labels_subsection, text=sell_price_text)
+                sell_price_label = tk.Label(label_frame, text=sell_price_text)
                 sell_price_label.pack(side=tk.TOP, anchor=tk.W)
+                sell_price_label.config(bg=INVENTORY_COLOUR)
+                self._sell_price_labels[item] = sell_price_label
 
             if buy_price is not None:
                 buy_price_text = f"Buy Price: ${buy_price}"
-                buy_price_label = tk.Label(labels_subsection, text=buy_price_text)
+                buy_price_label = tk.Label(label_frame, text=buy_price_text)
                 buy_price_label.pack(side=tk.TOP, anchor=tk.W)
+                buy_price_label.config(bg=INVENTORY_COLOUR)
+                self._buy_price_labels[item] = buy_price_label
 
             button_frame = tk.Frame(section)
-            button_frame.pack(side=tk.RIGHT)
+            button_frame.pack(side=tk.RIGHT, padx=3)
 
             if buy_price is not None:
                 buy_button = tk.Button(button_frame, text=f"Buy ({buy_price})",
@@ -165,7 +183,7 @@ class ItemView(tk.Frame):
             if sell_price is not None:
                 sell_button = tk.Button(button_frame, text=f"Sell ({sell_price})",
                                         command=lambda item=item: sell_command(item))
-                sell_button.pack(side=tk.LEFT)
+                sell_button.pack(side=tk.RIGHT)
 
             if select_command:
                 section.bind('<Button-1>', lambda event, item=item: select_command(item))
@@ -179,8 +197,34 @@ class ItemView(tk.Frame):
         for item, section in self._sections.items():
             quantity = inventory.get(item, 0)
             label_text = f"{item}: {quantity}"
-            section.config(text=label_text)
-
+            self._labels[item].config(text=label_text)
+            if quantity == 0:
+                self._sections[item].config(bg=INVENTORY_EMPTY_COLOUR)
+                self._label_frames[item].config(bg=INVENTORY_EMPTY_COLOUR)
+                self._labels[item].config(bg=INVENTORY_EMPTY_COLOUR)
+                if self._sell_price_labels.get(item) != None:
+                    self._sell_price_labels[item].config(bg=INVENTORY_EMPTY_COLOUR)
+                if self._buy_price_labels.get(item) != None:
+                    self._buy_price_labels[item].config(bg=INVENTORY_EMPTY_COLOUR)
+            elif item != None and item == self._selected_item:
+                self._sections[item].config(bg=INVENTORY_SELECTED_COLOUR)
+                self._label_frames[item].config(bg=INVENTORY_SELECTED_COLOUR)
+                self._labels[item].config(bg=INVENTORY_SELECTED_COLOUR)
+                if self._sell_price_labels.get(item) != None:
+                    self._sell_price_labels[item].config(bg=INVENTORY_SELECTED_COLOUR)
+                if self._buy_price_labels.get(item) != None:
+                    self._buy_price_labels[item].config(bg=INVENTORY_SELECTED_COLOUR)
+            elif item != None and item == self._prev_selected_item:
+                self._sections[item].config(bg=INVENTORY_COLOUR)
+                self._label_frames[item].config(bg=INVENTORY_COLOUR)
+                self._labels[item].config(bg=INVENTORY_COLOUR)
+                if self._sell_price_labels.get(item) != None:
+                    self._sell_price_labels[item].config(bg=INVENTORY_COLOUR)
+                if self._buy_price_labels.get(item) != None:
+                    self._buy_price_labels[item].config(bg=INVENTORY_COLOUR)
+    def set_selected_item(self, item_name):
+        self._prev_selected_item = self._selected_item
+        self._selected_item = item_name
 
 class FarmGame:
     def __init__(self, master: tk.Tk, map_file: str):
@@ -229,7 +273,7 @@ class FarmGame:
         # Update views
         self.info_bar.redraw(self.model._days_elapsed, self.model._player._money, self.model._player._energy)  # Replace placeholders with actual values
         self.farm_view.redraw(self.model._map, self.model._plants, self.model._player._position, self.model._player._direction)
-        # self.item_view.redraw(self.item_name, self.amount)  **********
+        self.item_view.redraw(self.model._player._inventory)
         # Replace placeholders with actual values
         # Implement similar update methods for other views as needed
 
@@ -237,61 +281,81 @@ class FarmGame:
         """Handle keypress events"""
         key = event.keysym
         (y, x) = self.model._player.get_position()
-        if key == 'Left':
+        if key == 'Left' or key == 'a':
             # Implement logic for handling left key press
             if self.model._player._direction != LEFT:
                 self.model._player._direction = LEFT
-            else:
-                if x - 1 >= 0:
-                    self.model._player.set_position((y, x - 1))
-        elif key == 'Right':
+            if x - 1 >= 0:
+                self.model._player.set_position((y, x - 1))
+        elif key == 'Right' or key == 'd':
             # Implement logic for handling right key press
             if self.model._player._direction != RIGHT:
                 self.model._player._direction = RIGHT
-            else:
-                if x + 1 < 10:
-                    self.model._player.set_position((y, x + 1))
-        elif key == 'Up':
+            if x + 1 < 10:
+                self.model._player.set_position((y, x + 1))
+        elif key == 'Up' or key == 'w':
             # Implement logic for handling right key press
             if self.model._player._direction != UP:
                 self.model._player._direction = UP
-            else:
-                if y > 0:
-                    self.model._player.set_position((y - 1, x))
-        elif key == 'Down':
+            if y > 0:
+                self.model._player.set_position((y - 1, x))
+        elif key == 'Down' or key == 's':
             # Implement logic for handling right key press
             if self.model._player._direction != DOWN:
                 self.model._player._direction = DOWN
-            else:
-                if y + 1 < 10:
-                    self.model._player.set_position((y + 1, x))
+            if y + 1 < 10:
+                self.model._player.set_position((y + 1, x))
         # Implement similar conditionals for other key press events
+        elif key == 'p':
+            self.plant()
         self.redraw()
 
     def select_item(self, item_name: str):
         """Handle item selection"""
         # Update the model with the selected item
-        self.model.select_item(item_name)
+        self.model._player.select_item(item_name)
+        self.item_view.set_selected_item(item_name)
+
         self.redraw()
 
     def buy_item(self, item_name: str):
         """Handle buying items"""
         # Update the model with the purchased item
-        self.model.buy_item(item_name, BUY_PRICES[item_name])  
+        self.model._player.buy(item_name, BUY_PRICES[item_name])
         self.redraw()
 
     def sell_item(self, item_name: str):
         """Handle selling items"""
         # Update the model with the sold item
-        self.model.sell_item(item_name, SELL_PRICES[item_name])  
+        self.model._player.sell(item_name, SELL_PRICES[item_name])  
         self.redraw()
 
     def advance_day(self):
         """Advance the game to the next day"""
         # Implement the logic for advancing to the next day in the model
-        self.model.new_day
+        self.model.new_day()
         self.redraw()
+    def plant(self):
+        """ Attempt to plant 
+        that seed at the player’s current position
+        """
+        pos = self.model.get_player_position()
+        plant = self.model._player._selected_item
+        if plant == None:
+            return
+        if self.model._map[pos[0]][pos[1]] != 'S':
+            return
+                # Setup plant map
+        new_plant = None
+        if (plant == ITEMS[0]):
+            new_plant = PotatoPlant()
+        if (plant == ITEMS[1]):
+            new_plant = KalePlant()
+        if (plant == ITEMS[2]):
+            new_plant = BerryPlant()
 
+        self.model.add_plant(pos, new_plant)
+        self.redraw()
 
 def play_game(root: tk.Tk, map_file: str) -> None:
     
